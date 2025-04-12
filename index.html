@@ -28,3 +28,171 @@
       flex-direction: column;
       justify-content: center;
       align-items: center;
+      text-align: center;
+    }
+    input, button, select {
+      padding: 0.5rem;
+      margin: 1rem 0;
+      font-size: 1rem;
+    }
+    .botoes {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      max-width: 600px;
+    }
+    .botoes.candidatos {
+      grid-template-columns: 1fr;
+      max-width: 300px;
+    }
+    button {
+      cursor: pointer;
+      text-align: center;
+    }
+    #resetar {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: transparent;
+      border: none;
+      color: transparent;
+      width: 30px;
+      height: 30px;
+      cursor: pointer;
+    }
+    #resetar:hover {
+      color: red;
+    }
+  </style>
+</head>
+<body>
+  <div id="tela-inicio" class="tela ativa" style="background-image: url('Screenshot_5.png');">
+    <button id="resetar" onclick="resetarVotantes()">R</button>
+    <h1>Votação de Representantes</h1>
+    <p>Digite seu nome completo para começar:</p>
+    <input type="text" id="nome-aluno" placeholder="Nome completo" />
+    <button onclick="irParaTurmas()">Entrar</button>
+  </div>
+
+  <div id="tela-turmas" class="tela">
+    <h2>Selecione sua turma:</h2>
+    <div class="botoes" id="lista-turmas"></div>
+  </div>
+
+  <div id="tela-votacao" class="tela">
+    <h2 id="titulo-turma"></h2>
+    <div class="botoes candidatos" id="lista-candidatos"></div>
+  </div>
+
+  <div id="tela-final" class="tela">
+    <h2>Obrigado por votar!</h2>
+    <p>Seu voto foi registrado com sucesso.</p>
+  </div>
+
+  <audio id="som-urna">
+    <source src="som-urna.mp3" type="audio/mpeg">
+  </audio>
+
+  <script>
+    const turmas = [
+      '601','602','603','604','605','606','607',
+      '701','702','703','704','705',
+      '801','802','803','804','805',
+      '901','902','903'
+    ];
+
+    const candidatos = {};
+    turmas.forEach(t => candidatos[t] = ['Candidato A', 'Candidato B']);
+
+    let votantes = JSON.parse(localStorage.getItem('votantes')) || [];
+
+    let nomeAluno = '';
+    let turmaSelecionada = '';
+
+    const sheetAPI = 'https://api.sheetbest.com/sheets/3ef96678-21c0-43c2-a5d7-c042267914cd';
+
+    function irParaTurmas() {
+      votantes = JSON.parse(localStorage.getItem('votantes')) || [];
+      const nome = document.getElementById('nome-aluno').value.trim();
+      if (!nome) return alert('Por favor, digite seu nome completo.');
+      if (votantes.includes(nome.toLowerCase())) {
+        return alert('Você já votou.');
+      }
+      nomeAluno = nome;
+      mostrarTela('tela-turmas');
+      gerarBotoesTurmas();
+    }
+
+    function gerarBotoesTurmas() {
+      const container = document.getElementById('lista-turmas');
+      container.innerHTML = '';
+      turmas.forEach(t => {
+        const btn = document.createElement('button');
+        btn.textContent = t;
+        btn.onclick = () => selecionarTurma(t);
+        container.appendChild(btn);
+      });
+    }
+
+    function selecionarTurma(turma) {
+      turmaSelecionada = turma;
+      document.getElementById('titulo-turma').textContent = `Candidatos da turma ${turma}`;
+      gerarCandidatos(turma);
+      mostrarTela('tela-votacao');
+    }
+
+    function gerarCandidatos(turma) {
+      const container = document.getElementById('lista-candidatos');
+      container.innerHTML = '';
+      candidatos[turma].forEach(nome => {
+        const btn = document.createElement('button');
+        btn.textContent = nome;
+        btn.onclick = () => votar(nome);
+        container.appendChild(btn);
+      });
+    }
+
+    function votar(candidato) {
+      const audio = document.getElementById('som-urna');
+      votantes.push(nomeAluno.toLowerCase());
+      localStorage.setItem('votantes', JSON.stringify(votantes));
+
+      fetch(sheetAPI, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nome: nomeAluno,
+          turma: turmaSelecionada,
+          candidato: candidato,
+          horario: new Date().toLocaleString()
+        })
+      })
+      .then(() => {
+        audio.play();
+        mostrarTela('tela-final');
+        setTimeout(() => {
+          document.getElementById('nome-aluno').value = '';
+          mostrarTela('tela-inicio');
+        }, 3000);
+      })
+      .catch(err => {
+        alert('Erro ao registrar o voto. Tente novamente.');
+        console.error(err);
+      });
+    }
+
+    function mostrarTela(id) {
+      document.querySelectorAll('.tela').forEach(t => t.classList.remove('ativa'));
+      document.getElementById(id).classList.add('ativa');
+    }
+
+    function resetarVotantes() {
+      if (confirm('Tem certeza que deseja apagar os registros de votação?')) {
+        localStorage.removeItem('votantes');
+        votantes = [];
+        alert('Registros apagados com sucesso.');
+      }
+    }
+  </script>
+</body>
+</html>
